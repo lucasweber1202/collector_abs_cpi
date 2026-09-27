@@ -42,7 +42,8 @@ PROD = os.getenv("PROD", "false").lower() in ("1", "true", "yes")
 
 DATABASE_URL = os.getenv("COLLECTOR_DB_URL", "")
 
-DEFAULT_START_DATE = date.fromisoformat(os.getenv("COLLECTOR_START_DATE", "1960-01-01"))
+# Table 17 quarterly all groups begins in September 1948; keep the full history.
+DEFAULT_START_DATE = date.fromisoformat(os.getenv("COLLECTOR_START_DATE", "1948-01-01"))
 
 REQUEST_TIMEOUT = float(os.getenv("COLLECTOR_HTTP_TIMEOUT", "30"))
 DOWNLOAD_DELAY = float(os.getenv("COLLECTOR_DOWNLOAD_DELAY", "1.0"))
