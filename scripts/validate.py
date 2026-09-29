@@ -84,14 +84,18 @@ def validate_release(data: SourceData) -> ValidationReport:
     for month in months:
         index = values.get((headline, month))
         if index is None or abs(values[(total, month)] - index) > IDENTITY_TOLERANCE:
-            raise TargetValidationError(f"All-groups contribution {values[(total, month)]} != index {index} at {month}")
+            raise TargetValidationError(
+                f"All-groups contribution {values[(total, month)]} != index {index} at {month}"
+            )
         try:
             gap = abs(sum(values[(sid, month)] for sid in groups.values()) - index)
         except KeyError as exc:
             raise TargetValidationError(f"Group contribution missing at {month}: {exc}") from exc
         worst = max(worst, gap)
         if gap > GROUP_SUM_TOLERANCE:
-            raise TargetValidationError(f"Group contributions miss all groups by {gap:.3f} at {month}")
+            raise TargetValidationError(
+                f"Group contributions miss all groups by {gap:.3f} at {month}"
+            )
     quarterly = build_series_id(QUARTERLY_ALL_GROUPS)
     linked = 0
     worst_link = 0.0
@@ -99,16 +103,24 @@ def validate_release(data: SourceData) -> ValidationReport:
         if sid != quarterly or quarter < LINKAGE_FROM:
             continue
         months_in = [date(quarter.year, quarter.month - k, 1) for k in (2, 1, 0)]
-        monthly = [v for (s, d), v in values.items() if s == headline and (d.year, d.month) in {(m.year, m.month) for m in months_in}]
+        monthly = [
+            v
+            for (s, d), v in values.items()
+            if s == headline and (d.year, d.month) in {(m.year, m.month) for m in months_in}
+        ]
         if len(monthly) != 3:
             continue
         gap = abs(sum(monthly) / 3 - value)
         worst_link = max(worst_link, gap)
         linked += 1
         if gap > LINKAGE_TOLERANCE:
-            raise TargetValidationError(f"Quarterly CPI {value} is not the monthly mean at {quarter} (gap {gap:.3f})")
+            raise TargetValidationError(
+                f"Quarterly CPI {value} is not the monthly mean at {quarter} (gap {gap:.3f})"
+            )
     if not months or not linked:
-        raise TargetValidationError("Nothing to validate: contributions or linkage quarters missing")
+        raise TargetValidationError(
+            "Nothing to validate: contributions or linkage quarters missing"
+        )
     report = ValidationReport(len(months), worst, linked, worst_link)
     logger.info("Target validation: %s", report)
     return report
