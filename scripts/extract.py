@@ -28,6 +28,12 @@ from scripts.config import REQUEST_TIMEOUT, USER_AGENT
 from scripts.releases import ReleaseEvidence
 from scripts.time_series import Observation
 
+# Canonical metadata vocabulary produced by this source.
+FREQUENCIES: frozenset[str] = frozenset({"monthly", "quarterly"})
+UNITS: frozenset[str] = frozenset({"index", "other"})
+ECO_GROUPS: frozenset[str] = frozenset({"consumer_prices"})
+
+
 logger = logging.getLogger(__name__)
 ROOT = "https://www.abs.gov.au"
 RELEASE_ROOT = (
@@ -42,7 +48,7 @@ MIN_PAYLOAD_BYTES = 50_000
 HEADER_LABELS = ("Unit", "Series Type", "Data Type", "Frequency")
 INDEX_PREFIX = "Index Numbers ;"
 CONTRIBUTION_PREFIX = "Contribution to All groups CPI Index Number ;"
-FREQUENCIES = {"Month": "monthly", "Quarter": "quarterly"}
+FREQ_MAP = {"Month": "monthly", "Quarter": "quarterly"}
 
 
 class SourceLayoutError(ValueError):
@@ -205,7 +211,7 @@ def parse_workbook(blob: bytes, url: str, published: date, table: str = "3") -> 
                 is_index = is_index and native == QUARTERLY_ALL_GROUPS
             if not is_index and not is_contribution:
                 continue
-            frequency = FREQUENCIES.get(str(header[4][i]))
+            frequency = FREQ_MAP.get(str(header[4][i]))
             if (
                 frequency is None
                 or (table == "3" and frequency != "monthly")
