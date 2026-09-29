@@ -6,6 +6,7 @@ the all-groups index. Table 17 (``6401017.xlsx``) supplies the quarterly
 all-groups index for Australia back to 1948. Percentage changes and changes in
 contribution are derived series and are not stored.
 """
+
 from __future__ import annotations
 
 import calendar
@@ -29,7 +30,9 @@ from scripts.time_series import Observation
 
 logger = logging.getLogger(__name__)
 ROOT = "https://www.abs.gov.au"
-RELEASE_ROOT = ROOT + "/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia"
+RELEASE_ROOT = (
+    ROOT + "/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia"
+)
 NATIVE_ID = re.compile(r"A[0-9]{7,9}[A-Z]")
 MONTHLY_ALL_GROUPS = "A130393720C"
 QUARTERLY_ALL_GROUPS = "A2325846C"
@@ -142,14 +145,31 @@ def _month_end(value: object) -> date:
     return date(day.year, day.month, calendar.monthrange(day.year, day.month)[1])
 
 
-def _descriptor(native: str, text: str, unit: str, frequency: str, url: str, published: date) -> dict[str, Any]:
+def _descriptor(
+    native: str, text: str, unit: str, frequency: str, url: str, published: date
+) -> dict[str, Any]:
     name = text.split(";")[1].strip()
     if text.startswith(CONTRIBUTION_PREFIX):
-        return {"name": f"{name}: contribution to All groups CPI", "description": f"{text} Index Points; ABS ID {native}",
-                "country": "AUD", "frequency": frequency, "unit": "other", "eco_group": "consumer_prices",
-                "source_url": url, "last_publish_date": published}
-    return {"name": name, "description": f"{text} ABS ID {native}", "country": "AUD", "frequency": frequency,
-            "unit": unit, "eco_group": "consumer_prices", "source_url": url, "last_publish_date": published}
+        return {
+            "name": f"{name}: contribution to All groups CPI",
+            "description": f"{text} Index Points; ABS ID {native}",
+            "country": "AUD",
+            "frequency": frequency,
+            "unit": "other",
+            "eco_group": "consumer_prices",
+            "source_url": url,
+            "last_publish_date": published,
+        }
+    return {
+        "name": name,
+        "description": f"{text} ABS ID {native}",
+        "country": "AUD",
+        "frequency": frequency,
+        "unit": unit,
+        "eco_group": "consumer_prices",
+        "source_url": url,
+        "last_publish_date": published,
+    }
 
 
 def parse_workbook(blob: bytes, url: str, published: date, table: str = "3") -> SourceData:
@@ -172,15 +192,25 @@ def parse_workbook(blob: bytes, url: str, published: date, table: str = "3") -> 
             text = str(header[0][i] or "")
             if i == 0 or header[2][i] != "Original" or not text.endswith(";  Australia ;"):
                 continue
-            is_index = text.startswith(INDEX_PREFIX) and header[1][i] == "Index Numbers" and header[3][i] == "INDEX"
-            is_contribution = text.startswith(CONTRIBUTION_PREFIX) and header[1][i] == "Index Points"
+            is_index = (
+                text.startswith(INDEX_PREFIX)
+                and header[1][i] == "Index Numbers"
+                and header[3][i] == "INDEX"
+            )
+            is_contribution = (
+                text.startswith(CONTRIBUTION_PREFIX) and header[1][i] == "Index Points"
+            )
             if table == "17":
                 is_contribution = False
                 is_index = is_index and native == QUARTERLY_ALL_GROUPS
             if not is_index and not is_contribution:
                 continue
             frequency = FREQUENCIES.get(str(header[4][i]))
-            if frequency is None or (table == "3" and frequency != "monthly") or (table == "17" and frequency != "quarterly"):
+            if (
+                frequency is None
+                or (table == "3" and frequency != "monthly")
+                or (table == "17" and frequency != "quarterly")
+            ):
                 raise SourceLayoutError(f"Unexpected ABS frequency {header[4][i]!r} for {native}")
             sid = build_series_id(str(native))
             if sid in catalog:
@@ -217,14 +247,19 @@ def filter_usable_series(data: SourceData, reference_month: date) -> SourceData:
         first, last = min(points), max(points)
         age = (reference_month.year - last.year) * 12 + reference_month.month - last.month
         history = (last.year - first.year) * 12 + last.month - first.month
-        if age <= MAX_STALE_MONTHS[data.catalog[sid]["frequency"]] and history >= MIN_HISTORY_MONTHS:
+        if (
+            age <= MAX_STALE_MONTHS[data.catalog[sid]["frequency"]]
+            and history >= MIN_HISTORY_MONTHS
+        ):
             usable.add(sid)
         else:
             logger.info("Dropped %s: age=%d months, history=%d months", sid, age, history)
     if build_series_id(MONTHLY_ALL_GROUPS) not in usable:
         raise SourceLayoutError("ABS all-groups CPI unavailable")
-    return SourceData([o for o in data.observations if o.series_id in usable],
-                      {sid: v for sid, v in data.catalog.items() if sid in usable})
+    return SourceData(
+        [o for o in data.observations if o.series_id in usable],
+        {sid: v for sid, v in data.catalog.items() if sid in usable},
+    )
 
 
 def collect() -> SourceData:
@@ -235,12 +270,23 @@ def collect() -> SourceData:
         table17 = check_payload(client.get(release.table17_url))
     monthly = parse_workbook(table3, release.table3_url, release.published, "3")
     quarterly = parse_workbook(table17, release.table17_url, release.published, "17")
-    merged = SourceData(monthly.observations + quarterly.observations, monthly.catalog | quarterly.catalog)
+    merged = SourceData(
+        monthly.observations + quarterly.observations, monthly.catalog | quarterly.catalog
+    )
     result = filter_usable_series(merged, release.reference_month)
     evidence = []
-    for name, url, part in (("table3_monthly", release.table3_url, monthly), ("table17_quarterly", release.table17_url, quarterly)):
+    for name, url, part in (
+        ("table3_monthly", release.table3_url, monthly),
+        ("table17_quarterly", release.table17_url, quarterly),
+    ):
         ids = frozenset(part.catalog) & frozenset(result.catalog)
         latest = max(o.reference_date for o in result.observations if o.series_id in ids)
         evidence.append(ReleaseEvidence(name, url, release.published, latest, ids))
-    logger.info("ABS CPI %s released %s: %d series, %d observations", release.reference_month, release.published, len(result.catalog), len(result.observations))
+    logger.info(
+        "ABS CPI %s released %s: %d series, %d observations",
+        release.reference_month,
+        release.published,
+        len(result.catalog),
+        len(result.observations),
+    )
     return SourceData(result.observations, result.catalog, tuple(evidence))

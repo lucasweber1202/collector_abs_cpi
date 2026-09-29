@@ -1,4 +1,5 @@
 """ABS identities, release page, payload checks, parsing and the live release."""
+
 from __future__ import annotations
 
 import os
@@ -46,7 +47,11 @@ def test_parse_keeps_index_and_contribution_but_not_percent_changes() -> None:
     assert build_series_id("A130393721F") not in data.catalog
     headline = data.catalog[build_series_id("A130393720C")]
     contribution = data.catalog[build_series_id("A130393723K")]
-    assert (headline["unit"], headline["frequency"], headline["country"]) == ("index", "monthly", "AUD")
+    assert (headline["unit"], headline["frequency"], headline["country"]) == (
+        "index",
+        "monthly",
+        "AUD",
+    )
     assert contribution["unit"] == "other" and "Index Points" in contribution["description"]
     assert headline["last_publish_date"] == date(2026, 8, 26)
     first = min(o.reference_date for o in data.observations)
@@ -54,7 +59,9 @@ def test_parse_keeps_index_and_contribution_but_not_percent_changes() -> None:
 
 
 def test_table17_keeps_only_the_australian_all_groups_quarterly() -> None:
-    data = parse_workbook(table17({date(1948, 9, 1): 2.6, date(2026, 6, 1): 102.31}), "u", date(2026, 8, 26), "17")
+    data = parse_workbook(
+        table17({date(1948, 9, 1): 2.6, date(2026, 6, 1): 102.31}), "u", date(2026, 8, 26), "17"
+    )
     assert list(data.catalog) == [build_series_id("A2325846C")]
     assert data.catalog[build_series_id("A2325846C")]["frequency"] == "quarterly"
     assert {o.reference_date for o in data.observations} == {date(1948, 9, 30), date(2026, 6, 30)}
@@ -66,7 +73,12 @@ def test_missing_all_groups_is_a_layout_error() -> None:
 
 
 def _response(body: bytes, content_type: str) -> httpx.Response:
-    return httpx.Response(200, content=body, headers={"content-type": content_type}, request=httpx.Request("GET", "https://www.abs.gov.au/f.xlsx"))
+    return httpx.Response(
+        200,
+        content=body,
+        headers={"content-type": content_type},
+        request=httpx.Request("GET", "https://www.abs.gov.au/f.xlsx"),
+    )
 
 
 def test_payload_check_rejects_html_and_non_xlsx() -> None:
@@ -75,7 +87,12 @@ def test_payload_check_rejects_html_and_non_xlsx() -> None:
     with pytest.raises(SourceAccessError, match="not an XLSX"):
         check_payload(_response(b"x" * 60000, "application/octet-stream"))
     with pytest.raises(SourceAccessError, match="small"):
-        check_payload(_response(b"PK\x03\x04tiny", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        check_payload(
+            _response(
+                b"PK\x03\x04tiny",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        )
 
 
 @pytest.mark.skipif(os.getenv("ABS_LIVE_SMOKE") != "1", reason="opt-in source test")
@@ -83,10 +100,18 @@ def test_live_release() -> None:
     from scripts.validate import validate_release
 
     result = collect()
-    points = {o.reference_date: o.value for o in result.observations if o.series_id == build_series_id("A130393720C")}
+    points = {
+        o.reference_date: o.value
+        for o in result.observations
+        if o.series_id == build_series_id("A130393720C")
+    }
     assert points[date(2026, 7, 31)] == 103.07
     assert points[date(2026, 6, 30)] == 102.03
-    quarterly = {o.reference_date: o.value for o in result.observations if o.series_id == build_series_id("A2325846C")}
+    quarterly = {
+        o.reference_date: o.value
+        for o in result.observations
+        if o.series_id == build_series_id("A2325846C")
+    }
     assert min(quarterly) == date(1948, 9, 30)
     assert len(result.catalog) >= 250
     assert {e.published for e in result.releases} == {date(2026, 8, 26)}

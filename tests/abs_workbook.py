@@ -7,10 +7,22 @@ from datetime import date
 
 import openpyxl
 
-LABELS = ["Unit", "Series Type", "Data Type", "Frequency", "Collection Month", "Series Start", "Series End", "No. Obs", "Series ID"]
+LABELS = [
+    "Unit",
+    "Series Type",
+    "Data Type",
+    "Frequency",
+    "Collection Month",
+    "Series Start",
+    "Series End",
+    "No. Obs",
+    "Series ID",
+]
 
 
-def workbook(columns: list[tuple[str, str, str, str, str]], rows: list[tuple[date, list[float | None]]]) -> bytes:
+def workbook(
+    columns: list[tuple[str, str, str, str, str]], rows: list[tuple[date, list[float | None]]]
+) -> bytes:
     """columns: (description, unit, data_type, frequency, series_id)."""
     book = openpyxl.Workbook()
     index = book.active
@@ -35,15 +47,47 @@ def workbook(columns: list[tuple[str, str, str, str, str]], rows: list[tuple[dat
 def table3(months: int = 20, shift: float = 0.0) -> bytes:
     """All groups, two groups (the rest folded into 'Housing'), their contributions."""
     columns = [
-        ("Index Numbers ;  All groups CPI ;  Australia ;", "Index Numbers", "INDEX", "Month", "A130393720C"),
-        ("Index Numbers ;  Food and non-alcoholic beverages ;  Australia ;", "Index Numbers", "INDEX", "Month", "A130395477A"),
-        ("Percentage Change from Previous Period ;  All groups CPI ;  Australia ;", "Percent", "PERCENT", "Month", "A130393721F"),
-        ("Contribution to All groups CPI Index Number ;  All groups CPI ;  Australia ;", "Index Points", "INDEX", "Month", "A130393723K"),
+        (
+            "Index Numbers ;  All groups CPI ;  Australia ;",
+            "Index Numbers",
+            "INDEX",
+            "Month",
+            "A130393720C",
+        ),
+        (
+            "Index Numbers ;  Food and non-alcoholic beverages ;  Australia ;",
+            "Index Numbers",
+            "INDEX",
+            "Month",
+            "A130395477A",
+        ),
+        (
+            "Percentage Change from Previous Period ;  All groups CPI ;  Australia ;",
+            "Percent",
+            "PERCENT",
+            "Month",
+            "A130393721F",
+        ),
+        (
+            "Contribution to All groups CPI Index Number ;  All groups CPI ;  Australia ;",
+            "Index Points",
+            "INDEX",
+            "Month",
+            "A130393723K",
+        ),
     ]
     from scripts.validate import GROUPS
 
     for n, group in enumerate(GROUPS):
-        columns.append((f"Contribution to All groups CPI Index Number ;  {group} ;  Australia ;", "Index Points", "INDEX", "Month", f"A1300000{n:02d}X"))
+        columns.append(
+            (
+                f"Contribution to All groups CPI Index Number ;  {group} ;  Australia ;",
+                "Index Points",
+                "INDEX",
+                "Month",
+                f"A1300000{n:02d}X",
+            )
+        )
     rows: list[tuple[date, list[float | None]]] = []
     for m in range(months):
         year, month = divmod(2024 * 12 + 11 + m, 12)
@@ -55,5 +99,13 @@ def table3(months: int = 20, shift: float = 0.0) -> bytes:
 
 
 def table17(values: dict[date, float]) -> bytes:
-    columns = [("Index Numbers ;  All groups CPI ;  Australia ;", "Index Numbers", "INDEX", "Quarter", "A2325846C")]
+    columns = [
+        (
+            "Index Numbers ;  All groups CPI ;  Australia ;",
+            "Index Numbers",
+            "INDEX",
+            "Quarter",
+            "A2325846C",
+        )
+    ]
     return workbook(columns, [(when, [value]) for when, value in sorted(values.items())])
