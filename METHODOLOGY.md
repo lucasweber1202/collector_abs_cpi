@@ -99,3 +99,37 @@ forces a single pass. Existing release classification remains in place.
 ## Masuko authority verification
 
 Pinned authority: `guimasuko/collector_template@4bc65765cedd9c14aec196cff382df6dfb318c77`. Physical `.github/` and `.vscode/` paths are checked against Git blobs. `.gitignore` and `scripts/databricks_engine.py` have no physical path in the template tree; they are canonical fenced blocks in `GUIDELINES.md` sections 8.1 and 8.9. The guideline Git blob is `089fbbca6a2241d3f02777b82631fbf81d49f6e0`; the two derived file blobs are `f0d1368264d24d7959d3137d618930a06f33795e` and `73821f7a530ab5cca2f5313180d71c17173e6e59`. `tests/test_architecture.py` checks all local blobs on every run. For independent source derivation, check out the exact authority commit and run `MASUKO_TEMPLATE_DIR=/path/to/collector_template python -m pytest -q tests/test_architecture.py`. This checks the guideline blob, extracts both fenced blocks and checks their hashes.
+
+
+## Revision-aware monitoring (2026-09-30)
+
+Monitoring also compares source values with latest stored vintages within the
+five-month rewind window. A changed value immediately returns to the pipeline
+without waiting for a newer reference period; previously this revision could be
+ignored until a later release or an explicit `--no-watch` run. The comparison is
+read-only and uses the same ten-decimal change rule as persistence. Unchanged
+sources still poll until the configured timeout. Scheduled one-shot command:
+`python main.py --no-watch`. Polling defaults remain prescribed by Masuko §10.
+
+
+## Current stored-output verification (2026-09-30)
+
+The August 2026 release, published 30 September 2026, now stores 10,985
+observations, 265 metadata rows, 917 original basket cells, 133 hierarchy
+nodes and 3,092 derived shares. A second live run wrote zero observations,
+vintages, same-day updates or metadata updates.
+
+An independent audit of the exported database workbook checked 855 stable-basket
+parent/month systems using the inverse-weighted relative above. All close within
+intervals implied by the published two-decimal index/contribution precision;
+maximum relative residual is 0.000373433. The 45 September 2025 annual chain
+boundary systems are separately identified rather than applying the unchanged
+basket identity across them. No published contributions or weights are adjusted.
+
+This interpretation agrees with ABS *Consumer Price Index: Concepts, Sources
+and Methods*, chapter 10 (price-updated expenditure and index-point
+contributions):
+https://www.abs.gov.au/statistics/detailed-methodology-information/concepts-sources-methods/consumer-price-index-concepts-sources-and-methods/2025/consumer-price-index-calculation-practice
+
+Python 3.11.16, PostgreSQL 16.15 and Spark 4.1.1 grammar checks pass.
+Corporate Databricks/AKV execution remains NOT_VERIFIED_CORPORATE.
