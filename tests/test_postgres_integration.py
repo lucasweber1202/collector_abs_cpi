@@ -96,7 +96,7 @@ def test_init_db_creates_the_canonical_tables_idempotently(engine: Engine) -> No
                 {"s": SCHEMA_NAME},
             ).scalars()
         )
-    assert tables == {"metadata", "time_series", "logs"}
+    assert tables == {"metadata", "time_series", "logs", "weights", "original_weights", "cpi_hierarchy"}
 
 
 def test_parser_output_passes_the_metadata_vocabulary() -> None:

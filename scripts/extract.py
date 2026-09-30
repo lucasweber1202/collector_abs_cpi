@@ -16,6 +16,7 @@ import io
 import logging
 import math
 import re
+import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -24,7 +25,13 @@ from urllib.parse import urljoin
 import httpx
 import openpyxl
 
-from scripts.config import REQUEST_TIMEOUT, USER_AGENT
+from scripts.config import (
+    BACKOFF_FACTOR,
+    DOWNLOAD_DELAY,
+    MAX_RETRIES,
+    REQUEST_TIMEOUT,
+    USER_AGENT,
+)
 from scripts.releases import ReleaseEvidence
 from scripts.time_series import Observation
 
@@ -115,7 +122,7 @@ def discover_release(client: httpx.Client, today: date) -> Release:
         index = today.year * 12 + today.month - 1 - offset
         year, month0 = divmod(index, 12)
         page = f"{RELEASE_ROOT}/{calendar.month_abbr[month0 + 1].lower()}-{year}"
-        response = client.get(page)
+        response = _http_get(client, page)
         if response.status_code == 404:
             continue
         response.raise_for_status()
@@ -272,14 +279,16 @@ def collect() -> SourceData:
     """Fetch Table 3 and Table 17 of the latest release and parse both."""
     with httpx.Client(timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
         release = discover_release(client, datetime.now(UTC).date())
-        table3 = check_payload(client.get(release.table3_url))
-        table17 = check_payload(client.get(release.table17_url))
+        table3 = check_payload(_http_get(client, release.table3_url))
+        table17 = check_payload(_http_get(client, release.table17_url))
     monthly = parse_workbook(table3, release.table3_url, release.published, "3")
     quarterly = parse_workbook(table17, release.table17_url, release.published, "17")
     merged = SourceData(
         monthly.observations + quarterly.observations, monthly.catalog | quarterly.catalog
     )
     result = filter_usable_series(merged, release.reference_month)
+    for fields in result.catalog.values():
+        fields["source_url"] = release.page_url
     evidence = []
     for name, url, part in (
         ("table3_monthly", release.table3_url, monthly),
@@ -296,3 +305,39 @@ def collect() -> SourceData:
         len(result.observations),
     )
     return SourceData(result.observations, result.catalog, tuple(evidence))
+
+
+def _http_get(client: httpx.Client, url: str) -> httpx.Response:
+    """Retry transport failures, HTTP 429 and 5xx; preserve source-specific checks."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            time.sleep(DOWNLOAD_DELAY)
+            response = client.get(url)
+            if response.status_code == 429 or response.status_code >= 500:
+                response.raise_for_status()
+            return response
+        except (httpx.TransportError, httpx.HTTPStatusError):
+            if attempt == MAX_RETRIES:
+                raise
+            wait = BACKOFF_FACTOR ** attempt
+            logging.getLogger(__name__).warning(
+                "GET failed, retry %d/%d in %.1fs", attempt, MAX_RETRIES, wait
+            )
+            time.sleep(wait)
+    raise RuntimeError("COLLECTOR_MAX_RETRIES must be positive")
+
+
+UPSTREAM_METADATA: dict[str, dict[str, Any]] = {}
+
+
+def collect_raw_data(start_date: date | None = None) -> dict[date, dict[str, float | None]]:
+    """Expose the canonical mapping and refresh upstream descriptors on every call."""
+    UPSTREAM_METADATA.clear()
+    data = collect()
+    UPSTREAM_METADATA.update(data.catalog)
+    parsed: dict[date, dict[str, float | None]] = {}
+    for item in data.observations:
+        if start_date is None or item.reference_date >= start_date:
+            parsed.setdefault(item.reference_date, {})[item.series_id] = item.value
+    logging.getLogger(__name__).info("Parsed %d dates", len(parsed))
+    return parsed
