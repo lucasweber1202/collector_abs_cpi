@@ -16,7 +16,7 @@ import shutil
 import pytest
 from sqlalchemy.sql.elements import TextClause
 
-from scripts import init_db, metadata, releases, run_logs, time_series
+from scripts import init_db, metadata, original_weights, releases, run_logs, time_series, weights
 
 
 def statements() -> list[str]:
@@ -26,6 +26,15 @@ def statements() -> list[str]:
         init_db.CREATE_METADATA_TABLE,
         init_db.CREATE_TIME_SERIES_TABLE.format(double_type="DOUBLE"),
         init_db.CREATE_LOGS_TABLE,
+        init_db.CREATE_ORIGINAL_WEIGHTS_TABLE.format(double_type="DOUBLE"),
+        init_db.CREATE_HIERARCHY_TABLE,
+        init_db.CREATE_WEIGHTS_TABLE.format(double_type="DOUBLE"),
+        original_weights._LATEST_WEIGHTS_SQL,
+        original_weights._UPDATE_WEIGHT_SQL,
+        original_weights._SELECT_HIERARCHY_SQL,
+        original_weights._UPDATE_HIERARCHY_SQL,
+        weights._LATEST_SQL,
+        weights._UPDATE_SQL,
         metadata._SELECT_SQL,
         metadata._UPDATE_SQL,
         time_series._AGGREGATES_SQL,
@@ -41,6 +50,12 @@ def statements() -> list[str]:
             metadata._merge_statement(count),
             time_series._insert_statement(count),
             time_series._merge_statement(count),
+            original_weights._insert_statement(original_weights._WEIGHTS, original_weights._WEIGHT_COLUMNS, count),
+            original_weights._insert_statement(original_weights._HIERARCHY, original_weights._HIERARCHY_COLUMNS, count),
+            original_weights.weight_merge_statement(count),
+            original_weights.hierarchy_merge_statement(count),
+            weights._insert_statement(count),
+            weights._merge_statement(count),
         ]
     out = []
     for statement in emitted:

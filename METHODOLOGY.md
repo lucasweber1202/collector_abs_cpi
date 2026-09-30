@@ -35,34 +35,46 @@ series, 10,721 observations, September 1948 – July 2026. All groups
 series starts April 2024; contributions start December 2024; the quarterly
 series gives the long history. Default start date is 1948-01-01.
 
-## Official weights in effect and target validation
+## Official baskets, hierarchy and effective shares
 
-ABS publishes, every month, the index-points contribution of each group,
-sub-group and expenditure class to the all-groups index. That is the official
-aggregation weight in effect (a component's contribution divided by the
-all-groups index is its effective share), so it is stored as published rather
-than derived. `scripts/validate.py` runs before the write transaction:
+`weight_sources.py` discovers the latest ABS annual weight update workbook.
+Table 5 contains explicit group/subgroup/class label columns: these determine
+parentage, including repeated labels, rather than guessing from series codes.
+The stored `cpi_hierarchy` has 133 nodes (132 monthly indices and quarterly
+headline). Every contribution identity is checked against its index identity.
 
-- the all-groups contribution equals the all-groups index (±0.005);
-- the 11 group contributions add up to the all-groups index every month
-  (±0.06; 20 months checked, largest gap 0.02 on the July 2026 release);
-- from the September 2025 quarter (first full quarter of the complete monthly
-  CPI) the quarterly all-groups equals the mean of its three monthly indexes
-  (±0.011; 4 quarters, largest gap 0.007). Earlier quarters were compiled from
-  the quarterly CPI and are not forced to match.
+`original_weights` preserves the seven published annual baskets (2019–2025,
+917 cells) in percent, unchanged, with price-reference quarter and vintage.
+The Table 3 contribution levels also remain unchanged in `time_series`.
+`weights` stores closing-period component shares: contribution to all groups
+of the child divided by the sum of its siblings' contributions. Siblings sum
+to 1. Headlines carry weight 1 for every observed period. These are shares of
+index contributions, **not coefficients for SUMPRODUCT of index levels**.
+Within an unchanged basket, prior-period shares aggregate component index
+relatives; closing-period shares reconstruct the parent relative through
+`1 / SUM(weight(t) / (index(t)/index(t-1)))`. Reweighting/chain-link boundaries
+must be handled using the original annual basket and published contributions.
 
-Hierarchy: the 11 groups are the first column carrying each official group
-name. Sub-group/class parentage is not published as codes in these files and
-is not inferred by name order (two names repeat across levels), so no
-hierarchy table is stored.
+Official contributions cover December 2024 onward. Earlier component shares
+are not fabricated. Historical quarterly headline has no published child
+indices in this selection and has weight 1. Validation checks all monthly
+headline/group contributions (rounding tolerance 0.06), child contributions
+at every hierarchy level (0.005 per rounded cell), and monthly/quarterly
+headline linkage from September 2025 (tolerance 0.011).
+
+`python -m scripts.export_validation_xlsx --output /path/validation.xlsx`
+exports stored latest-vintage `time_series`, `weights`, `original_weights`
+and `cpi_hierarchy`, one sheet per table; it never downloads a fresh release.
+Use the hierarchy and raw contributions to audit aggregation and the baskets
+to audit transformations; weights alone do not remove chain-link boundaries.
 
 ## Release monitoring
 
-`scripts/releases.py` classifies each workbook on every run from the page's
-Released date and the latest covered period, compared with `metadata` before
-the run, plus the rows changed: `first_release`, `same_release`,
-`new_release`, `revised_source` or `layout_changed`. An unchanged rerun on a
-later day is `same_release`; a Released date that goes backwards fails the run.
+Empty headline history triggers immediate historical ingestion. Once populated,
+the default waits for the next calendar month, polling every 30 seconds for up
+to 900 seconds (`COLLECTOR_POLL_INTERVAL`, `COLLECTOR_MAX_WAIT`). A timeout is
+normal and persists a success log. `--no-watch` or an explicit `--start-date`
+forces a single pass. Existing release classification remains in place.
 
 ## Point in time
 

@@ -47,6 +47,39 @@ CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.logs (
 )"""
 
 
+CREATE_ORIGINAL_WEIGHTS_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.original_weights (
+    series_id VARCHAR(200) NOT NULL,
+    reference_date DATE NOT NULL,
+    vintage_date DATE NOT NULL,
+    weight {{double_type}} NOT NULL,
+    weight_base_year INTEGER NOT NULL,
+    collected_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_original_weights PRIMARY KEY (series_id, reference_date, vintage_date)
+)"""
+CREATE_HIERARCHY_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.cpi_hierarchy (
+    series_id VARCHAR(200) NOT NULL,
+    native_code VARCHAR(50) NOT NULL,
+    parent_id VARCHAR(200),
+    level INTEGER NOT NULL,
+    name VARCHAR(500) NOT NULL,
+    collected_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_cpi_hierarchy PRIMARY KEY (series_id)
+)"""
+
+
+CREATE_WEIGHTS_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.weights (
+    series_id VARCHAR(200) NOT NULL,
+    reference_date DATE NOT NULL,
+    vintage_date DATE NOT NULL,
+    weight {{double_type}} NOT NULL,
+    collected_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_weights PRIMARY KEY (series_id, reference_date, vintage_date)
+)"""
+
+
 def init_db(engine: Engine) -> None:
     """Create the schema and tables idempotently."""
     double_type = "DOUBLE PRECISION" if engine.dialect.name == "postgresql" else "DOUBLE"
@@ -56,6 +89,9 @@ def init_db(engine: Engine) -> None:
             CREATE_METADATA_TABLE,
             CREATE_TIME_SERIES_TABLE.format(double_type=double_type),
             CREATE_LOGS_TABLE,
+            CREATE_ORIGINAL_WEIGHTS_TABLE.format(double_type=double_type),
+            CREATE_HIERARCHY_TABLE,
+            CREATE_WEIGHTS_TABLE.format(double_type=double_type),
         ):
             conn.execute(text(statement))
 
