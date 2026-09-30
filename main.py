@@ -24,7 +24,7 @@ from scripts.metadata import upsert_metadata
 from scripts.original_weights import upsert_hierarchy, upsert_original_weights
 from scripts.releases import LAYOUT_CHANGED, classify_evidence, stored_release
 from scripts.run_logs import insert_run_log
-from scripts.time_series import get_last_observations, upsert_time_series
+from scripts.time_series import get_last_observations, has_source_revisions, upsert_time_series
 from scripts.validate import validate_release
 from scripts.weight_sources import collect_baskets, derive_weights
 from scripts.weights import upsert_weights
@@ -157,6 +157,9 @@ def _collect_for_release(engine: Engine, args: argparse.Namespace) -> SourceData
         latest = max(o.reference_date for o in data.observations if o.series_id == HEADLINE_SERIES)
         if latest >= expected:
             logger.info("New target period detected: %s", latest)
+            return data
+        if has_source_revisions(engine, data.observations, _start_date(engine, None)):
+            logger.info("Source revision detected before the next reference period")
             return data
         remaining = deadline - time.monotonic()
         if remaining <= 0:
